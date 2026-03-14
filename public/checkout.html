@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout - FarmDirect</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body style="background-color: var(--bg-color);">
+  <header>
+    <nav>
+      <div class="logo" onclick="window.location.href='index.html'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+        Farm<span>Direct</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="#" id="dashboard-link" style="display: none;">Dashboard</a></li>
+        <li class="user-only"><a href="user-dashboard.html">My Orders</a></li>
+        <li class="admin-only"><a href="admin-dashboard.html">Manage</a></li>
+        <li class="delivery-only"><a href="delivery-dashboard.html">Deliveries</a></li>
+      </ul>
+      <div class="auth-buttons">
+        <div id="auth-controls"></div>
+        <a href="cart.html" class="cart-icon-container">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+          Cart
+          <span class="cart-badge" id="cart-badge-count">0</span>
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="cart-layout mt-2">
+      <div class="cart-items-container">
+        <h2 class="cart-header">Checkout</h2>
+        <form id="checkoutForm">
+          <h3 class="mb-2">Delivery Details</h3>
+          <div class="checkout-grid mb-2">
+            <div class="form-group">
+              <label>First Name</label>
+              <input type="text" id="fname" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label>Last Name</label>
+              <input type="text" id="lname" class="form-control" required>
+            </div>
+            <div class="form-group checkout-full">
+              <label>Full Address</label>
+              <textarea id="address" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" id="city" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label>Postal Code</label>
+              <input type="text" id="zip" class="form-control" required>
+            </div>
+          </div>
+
+          <h3 class="mb-2">Payment Method</h3>
+          <div class="checkout-grid mb-2">
+            <div class="form-group checkout-full" style="display: flex; gap: 1rem; align-items: center; padding: 1rem; border: 1px solid var(--primary); border-radius: var(--radius-md); background: var(--primary-light);">
+              <input type="radio" name="payment" id="cod" checked style="width: 20px; height: 20px;">
+              <label for="cod" style="margin: 0; font-size: 1.1rem; color: var(--primary-dark);">Cash on Delivery (COD)</label>
+            </div>
+            <div class="form-group checkout-full" style="display: flex; gap: 1rem; align-items: center; padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+              <input type="radio" name="payment" id="card" disabled style="width: 20px; height: 20px;">
+              <label for="card" style="margin: 0; font-size: 1.1rem; color: var(--text-muted);">Credit / Debit Card (Coming Soon)</label>
+            </div>
+            <div class="form-group checkout-full" style="display: flex; gap: 1rem; align-items: center; padding: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+              <input type="radio" name="payment" id="upi" disabled style="width: 20px; height: 20px;">
+              <label for="upi" style="margin: 0; font-size: 1.1rem; color: var(--text-muted);">UPI (Coming Soon)</label>
+            </div>
+          </div>
+        </form>
+      </div>
+      
+      <div class="cart-summary">
+        <h3 class="mb-2" style="font-size: 1.4rem;">Order Summary</h3>
+        <div id="checkout-items" style="margin-bottom: 1.5rem; max-height: 200px; overflow-y: auto;">
+          <!-- Items List -->
+        </div>
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span id="checkout-subtotal">₹0</span>
+        </div>
+        <div class="summary-row">
+          <span>Delivery</span>
+          <span>₹40</span>
+        </div>
+        <div class="summary-total">
+          <span>Total To Pay</span>
+          <span id="checkout-total">₹0</span>
+        </div>
+        <button class="btn btn-primary" style="width: 100%; padding: 1.2rem; font-size: 1.2rem;" onclick="placeOrder()">
+          Place Order
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!token) {
+        window.location.href = 'login.html?redirect=checkout.html';
+        return;
+      }
+      
+      if (window.cart.length === 0) {
+        window.location.href = 'cart.html';
+        return;
+      }
+      
+      // Pre-fill user data
+      if (currentUser) {
+        const names = currentUser.name ? currentUser.name.split(' ') : ['', ''];
+        document.getElementById('fname').value = names[0] || '';
+        document.getElementById('lname').value = names.slice(1).join(' ') || '';
+        if(currentUser.address && currentUser.address.full) {
+          document.getElementById('address').value = currentUser.address.full;
+        }
+      }
+
+      const itemsContainer = document.getElementById('checkout-items');
+      itemsContainer.innerHTML = window.cart.map(item => `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.95rem;">
+          <span>${item.qty}x ${item.name}</span>
+          <span>₹${item.price * item.qty}</span>
+        </div>
+      `).join('');
+
+      const subtotal = window.getCartTotal();
+      document.getElementById('checkout-subtotal').textContent = `₹${subtotal}`;
+      document.getElementById('checkout-total').textContent = `₹${subtotal + 40}`;
+    });
+
+    async function placeOrder() {
+      const form = document.getElementById('checkoutForm');
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const address = {
+        full: document.getElementById('address').value,
+        city: document.getElementById('city').value,
+        zip: document.getElementById('zip').value
+      };
+
+      const payload = {
+        items: window.cart.map(i => ({ groceryId: i.groceryId, qty: i.qty, price: i.price })),
+        address: address,
+        total: window.getCartTotal() + 40
+      };
+
+      try {
+        const res = await apiFetch('/user/order', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+
+        if (res.orderId) {
+          window.cart = [];
+          window.updateCart();
+          alert('Order placed successfully! Order ID: ' + res.orderId);
+          window.location.href = 'index.html';
+        } else {
+          alert('Failed to place order: ' + (res.error || 'Unknown error'));
+        }
+      } catch(e) {
+        alert('An error occurred. Please try again.');
+      }
+    }
+  </script>
+</body>
+</html>

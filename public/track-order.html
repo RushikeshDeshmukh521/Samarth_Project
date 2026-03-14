@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Order - FarmDirect</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo" onclick="window.location.href='index.html'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+        Farm<span>Direct</span>
+      </div>
+      <div class="nav-actions" style="display:flex; gap:1rem; align-items:center;">
+        <a href="user-dashboard.html" class="btn btn-outline">Back to Dashboard</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container" style="padding: 1.5rem 0;">
+    <h1 style="margin-bottom: 1rem;">Track Order</h1>
+
+    <div class="card" style="margin-bottom: 1rem;">
+      <h3>Order Summary</h3>
+      <div id="order-details" style="margin-top: 0.75rem;"></div>
+      <p style="margin-top: 0.75rem;">
+        Status: <strong id="order-status">Loading...</strong>
+      </p>
+    </div>
+
+    <div class="card" style="margin-bottom: 1rem;">
+      <h3>Live Map</h3>
+      <div id="track-map" style="width: 100%; height: 320px; border-radius: 0.75rem; overflow: hidden; margin-top: 0.75rem;"></div>
+    </div>
+
+    <div class="card">
+      <h3>Chat with Delivery</h3>
+      <div id="chat-messages" style="min-height: 180px; margin-top: 0.75rem; padding: 0.75rem; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow-y: auto;"></div>
+      <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+        <input id="chat-input" class="form-control" placeholder="Type a message" style="flex:1;" />
+        <button class="btn btn-primary" onclick="sendChat()">Send</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('id');
+
+    const orderStatusEl = document.getElementById('order-status');
+    const detailsEl = document.getElementById('order-details');
+
+    // Ensure we join only after socket is available (from app.js)
+    const joinOrderRoom = () => {
+      if (typeof socket !== 'undefined' && socket) {
+        socket.emit('join-order', orderId);
+        socket.on('order-status', (status) => {
+          orderStatusEl.textContent = status;
+        });
+        socket.on('delivery-location', (loc) => {
+          if (loc && loc.lat && loc.lng) {
+            marker.setLatLng([loc.lat, loc.lng]);
+            map.panTo([loc.lat, loc.lng]);
+          }
+        });
+        socket.on('new-message', (msg) => addChatMessage(msg));
+      } else {
+        setTimeout(joinOrderRoom, 200);
+      }
+    };
+
+    apiFetch(`/user/order/${orderId}`).then(order => {
+      if (!order || order.error) {
+        detailsEl.innerHTML = '<p>Order not found.</p>';
+        return;
+      }
+      detailsEl.innerHTML = `
+        <p><strong>ID:</strong> ${order.id}</p>
+        <p><strong>Total:</strong> ₹${order.total}</p>
+        <p><strong>Items:</strong> ${order.items || '—'}</p>
+      `;
+      orderStatusEl.textContent = order.status || 'pending';
+
+      // Join socket room after we have an order id
+      joinOrderRoom();
+    }).catch(() => {
+      detailsEl.innerHTML = '<p>Failed to load order details.</p>';
+      orderStatusEl.textContent = 'error';
+    });
+
+    const map = L.map('track-map').setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    const marker = L.marker([20.5937, 78.9629]).addTo(map);
+
+    window.sendChat = () => {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+      socket.emit('send-message', { orderId, content: msg });
+      addChatMessage({ content: msg, sender: 'You' });
+      input.value = '';
+    };
+
+    function addChatMessage(msg) {
+      const container = document.getElementById('chat-messages');
+      const line = document.createElement('div');
+      line.style.marginBottom = '0.4rem';
+      line.textContent = `${msg.sender || 'Driver'}: ${msg.content}`;
+      container.appendChild(line);
+      container.scrollTop = container.scrollHeight;
+    }
+  </script>
+</body>
+</html>

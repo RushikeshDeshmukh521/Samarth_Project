@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Category - FarmDirect</title>
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo" onclick="window.location.href='index.html'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+        Farm<span>Direct</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="#" id="dashboard-link" style="display: none;">Dashboard</a></li>
+        <li class="user-only"><a href="user-dashboard.html">My Orders</a></li>
+        <li class="admin-only"><a href="admin-dashboard.html">Manage</a></li>
+        <li class="delivery-only"><a href="delivery-dashboard.html">Deliveries</a></li>
+      </ul>
+      <div class="auth-buttons">
+        <div id="auth-controls"></div>
+        <a href="cart.html" class="cart-icon-container">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+          Cart
+          <span class="cart-badge" id="cart-badge-count">0</span>
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="section-header" style="margin-top: 2rem;">
+      <h2 id="category-title">Loading Category...</h2>
+    </div>
+    
+    <div class="grocery-grid" id="category-grid">
+      <!-- Loaded via JS -->
+    </div>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const catId = urlParams.get('id');
+      const catName = urlParams.get('name');
+
+      if (catName) {
+        document.getElementById('category-title').textContent = catName;
+      }
+
+      if (catId) {
+        apiFetch(`/user/category/${catId}/groceries`).then(groceries => {
+          const grid = document.getElementById('category-grid');
+          if (groceries.length === 0) {
+            grid.innerHTML = '<p>No products found in this category.</p>';
+            return;
+          }
+          grid.innerHTML = groceries.map(g => window.createProductCard(g)).join('');
+        }).catch(err => {
+          document.getElementById('category-grid').innerHTML = '<p>Failed to load products.</p>';
+        });
+      } else {
+        document.getElementById('category-title').textContent = "Invalid Category";
+      }
+    });
+  </script>
+</body>
+</html>

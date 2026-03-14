@@ -1,0 +1,1 @@
+USE farmdirect; SELECT id,name,price FROM groceries LIMIT 5;

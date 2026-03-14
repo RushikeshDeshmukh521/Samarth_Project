@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Delivery Dashboard - FarmDirect</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header><!-- nav --></header>
+
+  <main class="container">
+    <h1>Delivery Dashboard</h1>
+    <div class="dashboard-grid">
+      <div class="card">
+        <h3>Assignments</h3>
+        <table id="assignments-table">
+          <!-- GET /api/delivery/get-assignments, accept btn POST /api/delivery/assignment/${id}/accept-assignment -->
+        </table>
+      </div>
+      <div class="card">
+        <h3>Current Order</h3>
+        <div id="current-order"></div>
+        <div id="otp-section" style="display:none;">
+          <button onclick="sendOTP()">Send OTP</button>
+          <input placeholder="Enter OTP" id="otp-input">
+          <button onclick="verifyOTP()">Verify</button>
+        </div>
+        <div class="map-container" id="delivery-map"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    apiFetch('/delivery/get-assignments').then(assignments => {
+      // render table with accept btns
+    });
+
+    apiFetch('/delivery/current-order').then(order => {
+      document.getElementById('current-order').innerHTML = order ? `<p>Order ${order.id}</p>` : 'No current';
+      // show OTP
+    });
+
+    window.sendOTP = () => apiFetch('/delivery/otp/send', {method: 'POST'}).then(() => alert('OTP sent'));
+    window.verifyOTP = () => apiFetch('/delivery/otp/verify', {method: 'POST', body: JSON.stringify({otp: document.getElementById('otp-input').value})});
+
+    // Map init with Leaflet if needed
+  </script>
+</body>
+</html>

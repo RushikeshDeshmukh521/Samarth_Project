@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Cart - FarmDirect</title>
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo" onclick="window.location.href='index.html'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+        Farm<span>Direct</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="#" id="dashboard-link" style="display: none;">Dashboard</a></li>
+        <li class="user-only"><a href="user-dashboard.html">My Orders</a></li>
+        <li class="admin-only"><a href="admin-dashboard.html">Manage</a></li>
+        <li class="delivery-only"><a href="delivery-dashboard.html">Deliveries</a></li>
+      </ul>
+      <div class="auth-buttons">
+        <div id="auth-controls"></div>
+        <a href="cart.html" class="cart-icon-container">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+          Cart
+          <span class="cart-badge" id="cart-badge-count">0</span>
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="cart-layout mt-2">
+      <div class="cart-items-container">
+        <h2 class="cart-header">Your Basket</h2>
+        <div id="cart-items">
+          <!-- JS Rendered -->
+        </div>
+      </div>
+      <div class="cart-summary">
+        <h3 class="mb-2" style="font-size: 1.4rem;">Order Summary</h3>
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span id="cart-subtotal">₹0</span>
+        </div>
+        <div class="summary-row">
+          <span>Delivery</span>
+          <span>₹40</span>
+        </div>
+        <div class="summary-total">
+          <span>Total</span>
+          <span id="cart-total-price">₹0</span>
+        </div>
+        <button class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1.1rem;" onclick="goToCheckout()">
+          Proceed to Checkout
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', renderCart);
+
+    function renderCart() {
+      const container = document.getElementById('cart-items');
+      if (window.cart.length === 0) {
+        container.innerHTML = `
+          <div class="text-center" style="padding: 3rem;">
+            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2" style="margin-bottom:1rem;"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+            <h3 style="color: var(--text-muted)">Your basket is empty</h3>
+            <p style="margin-top: 1rem;"><a href="index.html" class="btn btn-outline">Start Shopping</a></p>
+          </div>
+        `;
+        document.getElementById('cart-subtotal').textContent = '₹0';
+        document.getElementById('cart-total-price').textContent = '₹0';
+        return;
+      }
+
+      container.innerHTML = window.cart.map((item, index) => `
+        <div class="cart-item">
+          <img src="${item.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=100&q=80'}" alt="${item.name}" class="cart-item-img">
+          <div class="cart-item-info">
+            <h4>${item.name}</h4>
+            <div class="cart-item-price">₹${item.price} <span style="opacity:0.75; font-size:0.9rem;">/ ${item.unitLabel || 'each'}</span></div>
+          </div>
+          <div class="qty-control">
+            <div style="display:flex; align-items:center; gap:0.5rem; border:1px solid #ccc; border-radius:30px; padding:0.2rem;">
+              <button class="btn-qty" style="width:25px;height:25px;border:none;" onclick="changeQty(${index}, -1)">-</button>
+              <span class="qty-display">${item.qty}</span>
+              <button class="btn-qty" style="width:25px;height:25px;border:none;" onclick="changeQty(${index}, 1)">+</button>
+            </div>
+          </div>
+          <button class="cart-item-remove" onclick="removeItem(${index})">Remove</button>
+        </div>
+      `).join('');
+
+      const subtotal = window.getCartTotal();
+      document.getElementById('cart-subtotal').textContent = `₹${subtotal}`;
+      document.getElementById('cart-total-price').textContent = `₹${subtotal + 40}`;
+    }
+
+    function changeQty(index, change) {
+      if(window.cart[index].qty + change <= 0) {
+        removeItem(index);
+      } else {
+        window.cart[index].qty += change;
+        window.updateCart();
+        window.updateCartUI();
+        renderCart();
+      }
+    }
+
+    function removeItem(index) {
+      window.cart.splice(index, 1);
+      window.updateCart();
+      window.updateCartUI();
+      renderCart();
+    }
+
+    function goToCheckout() {
+      if (window.cart.length === 0) {
+        alert("Your cart is empty!");
+        return;
+      }
+      if (!token) {
+        window.location.href = 'login.html?redirect=checkout.html';
+      } else {
+        window.location.href = 'checkout.html';
+      }
+    }
+  </script>
+</body>
+</html>

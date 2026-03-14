@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Details - FarmDirect</title>
+  <link rel="stylesheet" href="style.css">
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo" onclick="window.location.href='index.html'">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+        Farm<span>Direct</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="#" id="dashboard-link" style="display: none;">Dashboard</a></li>
+        <li class="user-only"><a href="user-dashboard.html">My Orders</a></li>
+        <li class="admin-only"><a href="admin-dashboard.html">Manage</a></li>
+        <li class="delivery-only"><a href="delivery-dashboard.html">Deliveries</a></li>
+      </ul>
+      <div class="auth-buttons">
+        <div id="auth-controls"></div>
+        <a href="cart.html" class="cart-icon-container">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+          Cart
+          <span class="cart-badge" id="cart-badge-count">0</span>
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div id="product-detail-area">
+      <!-- Loaded via JS -->
+      <div class="text-center mt-2">Loading Product Details...</div>
+    </div>
+  </main>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const prodId = urlParams.get('id');
+
+      let currentQty = 1;
+
+      window.updateDetailQty = (change) => {
+        currentQty += change;
+        if(currentQty < 1) currentQty = 1;
+        document.getElementById('detail-qty').textContent = currentQty;
+      };
+
+      if (prodId) {
+        apiFetch(`/user/grocery/${prodId}`).then(product => {
+          if (!product || product.error) {
+            document.getElementById('product-detail-area').innerHTML = '<p>Product not found.</p>';
+            return;
+          }
+
+          document.title = `${product.name} - FarmDirect`;
+
+          window.detailAddToCart = () => {
+            for(let i=0; i<currentQty; i++) {
+              window.addToCart(product.id, product.name, Number(product.price), product.imageUrl, getUnitLabel(product));
+            }
+            alert(`Added ${currentQty} x ${product.name} to cart!`);
+          };
+
+          window.detailBuyNow = () => {
+            // Add to cart first, then redirect to checkout
+            const existing = window.cart.find(item => item.groceryId === product.id);
+            if (existing) {
+              existing.qty += currentQty;
+            } else {
+              window.cart.push({ groceryId: product.id, name: product.name, price: Number(product.price), qty: currentQty, imageUrl: product.imageUrl, unitLabel: getUnitLabel(product) });
+            }
+            window.updateCart();
+            window.location.href = 'checkout.html';
+          };
+
+          const html = `
+            <div class="product-detail-container mt-2">
+              <div class="product-gallery">
+                <span class="category-badge">${product.categoryName || 'General'}</span>
+                <img src="${product.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&q=80'}" alt="${product.name}">
+              </div>
+              <div class="product-info">
+                <div class="product-subtitle">${product.categoryName || 'General'}</div>
+                <h1>${product.name}</h1>
+                <div class="product-price-large">₹${product.price} <span style="font-size:0.9rem; opacity:0.8;">/ ${getUnitLabel(product)}</span></div>
+                <p class="product-description-large">${product.description || 'No description available for this product.'}</p>
+                <div class="mb-2">
+                  <span class="stock-badge ${product.stock > 0 ? '' : 'hidden'}">In Stock (${product.stock} left)</span>
+                  <span class="stock-badge" style="background: #FFEBEB; color: #E74C3C; display: ${product.stock <= 0 ? 'inline-block' : 'none'}">Out of Stock</span>
+                </div>
+                
+                <div class="product-actions" style="${product.stock <= 0 ? 'opacity: 0.5; pointer-events: none;' : ''}">
+                  <div class="qty-control-large">
+                    <button class="btn-qty-large" onclick="updateDetailQty(-1)">-</button>
+                    <span class="qty-display-large" id="detail-qty">1</span>
+                    <button class="btn-qty-large" onclick="updateDetailQty(1)">+</button>
+                  </div>
+                  <button class="btn btn-primary btn-add-large" onclick="detailAddToCart()">
+                    🛒 Add to Basket
+                  </button>
+                  <button class="btn btn-primary btn-add-large" style="background: #27AE60;" onclick="detailBuyNow()">
+                    ⚡ Buy Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+          document.getElementById('product-detail-area').innerHTML = html;
+        }).catch(err => {
+          document.getElementById('product-detail-area').innerHTML = '<p>Error loading product details.</p>';
+        });
+      } else {
+        document.getElementById('product-detail-area').innerHTML = "<p>Invalid Product Link</p>";
+      }
+    });
+  </script>
+</body>
+</html>
